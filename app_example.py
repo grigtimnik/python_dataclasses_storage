@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from storage import Storage, BaseRecord
+from storage import Storage, BaseRecord, create_with_auto_id
 
 
 @dataclass
@@ -26,8 +26,8 @@ storage.create_table_from_dataclasses(
 print("Appending records")
 advanced_records = [
     AdvancedRecord("001", name="Record1", description="This is the first record", value=123.45, tags="tag1"),
-    AdvancedRecord("002", name="Record2", description="Second record here", value=678.90, tags="tag2"),
-    AdvancedRecord("003", name="Record1", description="Version two of first record", value=321.00, tags="tag1"),
+    create_with_auto_id(AdvancedRecord, None, name="Record2", description="Second record here", value=678.90, tags="tag2"),
+    create_with_auto_id(AdvancedRecord, None, name="Record1", description="Version two of first record", value=321.00, tags="tag1"),
 ]
 
 for record in advanced_records:

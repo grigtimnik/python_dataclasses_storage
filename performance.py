@@ -1,6 +1,5 @@
 import timeit
 import random
-from tqdm import tqdm
 
 from dataclasses import dataclass
 
@@ -29,8 +28,7 @@ def test_performance(storage: Storage, num_records):
     records = generate_records(num_records)
     names = [record.name for record in records]
 
-    for record in tqdm(records):
-        storage.append(record)
+    storage.append_many(records)
 
     def search_by_id():
         random_id = str(random.randint(0, num_records - 1))

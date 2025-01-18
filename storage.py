@@ -1,14 +1,36 @@
 import sqlite3
 
 from dataclasses import dataclass, field, fields, asdict
-from typing import Type, Any
+from typing import Type, Any, List
 from time import time
+
+
+DEFAULT_CHUNK_SIZE = 1000
 
 
 @dataclass
 class BaseRecord:
     id: str
-    timestamp: int = field(init=False)
+    timestamp: int = field(default=None, init=False)
+
+
+def generate_id(record: BaseRecord) -> str:
+    record_data = asdict(record)
+    record_data.pop('id')
+    record_data.pop('timestamp')
+
+    return '_'.join(f"{key}:{value}" for key, value in sorted(record_data.items()))
+
+
+def create_with_auto_id(cls: Type[BaseRecord], *args, **kwargs) -> BaseRecord:
+    id_value = kwargs.pop('id', None)
+    if len(args) > 0:
+        id_value = args[0]
+        args = args[1:]
+    temp_instance = cls(id=id_value or '', *args, **kwargs)
+    if not temp_instance.id:
+        temp_instance.id = generate_id(temp_instance)
+    return temp_instance
 
 
 def python_to_sqlite_type(py_type: Any) -> str:
@@ -57,7 +79,7 @@ class Storage:
         for cls in classes:
             self.create_table_from_dataclass(cls)
 
-    def append(self, record: BaseRecord):
+    def append_one(self, record: BaseRecord):
         record.timestamp = int(time() * 1000)
         record_dict = asdict(record)
         fields = ', '.join(record_dict.keys())
@@ -71,7 +93,21 @@ class Storage:
             f'INSERT OR REPLACE INTO {record.__class__.__name__}_history ({fields}) VALUES ({values_description})',
             values
         )
+
+    def append(self, record: BaseRecord):
+        self.append_one(record)
         self.conn.commit()
+
+    def append_many(self, records: List[BaseRecord], chunk_size: int = DEFAULT_CHUNK_SIZE):
+        try:
+            for i in range(0, len(records), chunk_size):
+                chunk = records[i:i + chunk_size]
+                for record in chunk:
+                    self.append_one(record)
+                self.conn.commit()
+        except Exception as e:
+            self.conn.rollback()
+            raise e
 
     def search(self, cls: Type[BaseRecord], **filters):
         table_name = cls.__name__
@@ -177,7 +213,7 @@ class Storage:
                 self.storage = storage
                 self.cls = cls
 
-            def append(self, record):
+            def append(self, record: BaseRecord):
                 """
                 Appends dataclass instance to the storage.
 
@@ -185,7 +221,15 @@ class Storage:
                 """
                 self.storage.append(record)
 
-            def __getitem__(self, record_id):
+            def append_many(self, records: List[BaseRecord], chunk_size: int = DEFAULT_CHUNK_SIZE):
+                """
+                Appends list of dataclass instances to the storage.
+
+                example: storage[Record].append(new_records)
+                """
+                self.storage.append_many(records, chunk_size)
+
+            def __getitem__(self, record_id: str):
                 """
                 Retrieves a dataclass instance from the storage by its ID.
 
@@ -227,7 +271,7 @@ class Storage:
 
                     yield obj
 
-            def __delitem__(self, record_id):
+            def __delitem__(self, record_id: str):
                 """ Deletes a dataclass instance from the storage by its ID. """
                 self.storage.delete_by_key(self.cls, record_id)
 

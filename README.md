@@ -47,6 +47,8 @@ https://uneex.org/FrBrGeorge/ActualEducationalTasks/NoSqlite
 
 - timestamp - время в миллисекундах, задающееся автоматически при добавлении, id определяет пользователь
 
+- можно сгенерировать id автоматически, создавая экземпляры классов через create_with_auto_id
+
 
 ## Производительность
 
